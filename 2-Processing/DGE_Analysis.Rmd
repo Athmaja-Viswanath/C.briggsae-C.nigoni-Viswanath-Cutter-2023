@@ -1,0 +1,818 @@
+---
+title: "Li et al_analysis"
+author: "Athmaja"
+date: "2024-08-24"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#This document is a guide to replicate the analysis and results (after receivng readcounts) presented in Viswanath, Athmaja, and Asher D. Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
+
+#0. LOADING REQUIRED PACKAGES
+```{r}
+library(DESeq2)
+library(ggplot2)
+library(cowplot) #add on to ggplot for better themes and figure customization
+library(lemon) #to work with legends and axes in ggplot2
+library(dplyr)
+library(Biobase)
+library(readr)
+library(data.table)
+library(tidyr)
+
+theme_set(theme_classic())
+```
+
+#1. DATA PREPARATION
+##A. Loading orthologous genes names and getting species names for all orthologs
+```{r}
+# Read the file into a data table (fast and memory-efficient)
+orthologs_dt <- fread("../1-Input/orthologs_dnds2_athmaja_wb.txt", header = FALSE, col.names = "orthologs")
+
+# Ensure unique entries 
+orthologs <- unique(orthologs_dt$orthologs)
+orthologs
+
+#Summary and structure
+summary(orthologs)
+str(orthologs)
+
+# split gene names by species
+split_orthologs <- strsplit(orthologs, "__")
+br_ortho <- sapply(split_orthologs, `[`, 1) #"[" is the indexing operator to get specific index i.e., 1
+ni_ortho <- sapply(split_orthologs, `[`, 2)
+br_ortho[1:5]
+ni_ortho[1:5]
+```
+
+##B. Reading in count data files 
+```{r}
+# Read count data
+cbr_counts <- read.table("../1-Input/Cbr_fc_counts_AJ.txt", sep="\t", header=TRUE, row.names=1, comment.char="#")
+cni_counts <- read.table("../1-Input/Cnig_fc_counts_AJ.txt", sep="\t", header=TRUE, row.names=1, comment.char="#")
+
+# Filter counts by orthologs
+cbr_counts_ortho <- cbr_counts[br_ortho, 6:17]
+cni_counts_ortho <- cni_counts[ni_ortho, 6:17]
+
+# Combine counts and rename rownames
+counts <- cbind(cbr_counts_ortho, cni_counts_ortho)
+rownames(counts) <- orthologs
+
+rownames(cbr_counts_ortho) = orthologs
+rownames(cni_counts_ortho) = orthologs
+colnames(counts) = c("Cbr-Cbr1", "Cbr-Cbr2", "Cbr-Cbr3", #sample-mapped to, rep#
+                     "Cbr-Cni", "Cbr-Cni2", "Cbr-Cni3",
+                     "H2-Cbr1", "H2-Cbr2", "H2-Cbr3",
+                     "H1-Cbr1", "H1-Cbr2", "H1-Cbr3",
+                     "Cni-Cbr1", "Cni-Cbr2", "Cni-Cbr3",
+                     "Cni-Cni", "Cni-Cni2", "Cni-Cni3",
+                     "H2-Cni1", "H2-Cni2", "H2-Cni3",
+                     "H1-Cni1", "H1-Cni2", "H1-Cni3")
+##Saving Cni and Cbr orthologous genes
+write.csv(cbr_counts_ortho, "../3-Output/Allannotated_Cbrortho_genecounts.csv")
+write.csv(cni_counts_ortho, "../3-Output/Allannotated_Cniortho_genecounts.csv")
+
+# Output results
+head(counts)
+tail(counts)
+colnames(counts)
+str(counts)
+
+```
+
+##C. Getting data for genes inside introgression
+```{r}
+#library(dplyr)  # Assuming you use dplyr for the filter function
+
+# Function to get introgressed genes
+get_introgressed_genes <- function(start_range, end_range, chr) {
+  filtered_genes <- rownames(cbr_counts %>%
+    filter(Start > start_range & Start < end_range & Chr == chr))
+  orthologs[br_ortho %in% filtered_genes] #different gene name formats in orthologs and br_orhts + filtered genes
+}
+
+# Define introgression regions
+introgression_ZZY10307_h2 <- get_introgressed_genes(4742871, 12160550, "X")
+introgression_ZZY10330_h1 <- get_introgressed_genes(16392963, 21269251, "X")
+
+# Display results
+head(introgression_ZZY10330_h1)
+tail(introgression_ZZY10330_h1)
+head(introgression_ZZY10307_h2)
+tail(introgression_ZZY10307_h2)
+length(introgression_ZZY10330_h1)
+length(introgression_ZZY10307_h2)
+```
+
+##D. Identifying genes inside and outside introgressions, based on Cni coordinates. 
+Creating a data frame that includes the gene name, chromosomal location, and categorizes each gene as being in H1 introgression, H2 introgression, or the common Cni background.
+```{r}
+# Extract positions and rename rows
+introgressions <- cni_counts[ni_ortho, 1:3]
+rownames(introgressions) <- orthologs # these include the first three columns for orthologous genes with the chromosome, start & end position of orthologs
+
+# Add introgression background column
+introgressions$introgression <- "C. nigoni background"
+
+# Update introgression names based on presence in specific regions
+introgressions$introgression[rownames(introgressions) %in% introgression_ZZY10307_h2] <- "ZZY10307_h2"
+introgressions$introgression[rownames(introgressions) %in% introgression_ZZY10330_h1] <- "ZZY10330_h1"
+
+# Remove rows with NA values
+introgressions <- na.omit(introgressions)
+
+# View the final data
+View(introgressions)
+table(introgressions$introgression)
+
+# List gene names inside each introgression
+introgression_genes <- split(rownames(introgressions), introgressions$introgression) 
+#This splits the row names of introgressions into a list based on the values in the introgression column. introgression_genes is a named list where each element corresponds to a unique introgression type.
+#directly access the gene names for the specified introgressions.
+ZZY10307_introgression_genes <- introgression_genes[["ZZY10307_h2"]]
+ZZY10330_introgression_genes <- introgression_genes[["ZZY10330_h1"]]
+
+# C. nigoni chromosomes
+Chr_ni = c(CM008509.1="I", CM008510.1="II", CM008511.1="III", CM008512.1="IV", CM008513.1="V", CM008514.1="X")
+
+```
+
+##E. Merging dataframes to get the right datafile
+```{r}
+# Define column ranges for merging
+##these are the columns that correspond to Cbr-Cbr, Cni-Cni, H2-Cni, H1-Cni
+cols_to_merge <- c(1:3, 16:24)
+
+# Create merged data frames for each hybrid line
+counts_merge_ZZY10307_h2 <- counts[, cols_to_merge] #al hybrid gene counts are based on Cni mapping
+counts_merge_ZZY10330_h1 <- counts[, cols_to_merge]
+counts_merge <- counts[, cols_to_merge]
+
+# Update counts for introgressions of C. nigoni data with counts for inteogression of Cbr data 
+##For each hybrid line, substitute Cni counts for Cbr counts for genes within each introgression
+###Because these are C. briggsae genes, it makes more sense to have counts of alignments to the C. briggsae genome
+counts_merge_ZZY10307_h2[ZZY10307_introgression_genes,7:9] = counts[ZZY10307_introgression_genes,7:9]#replacing hybrid genes in merge file with gene counts in counts file
+counts_merge_ZZY10330_h1[ZZY10330_introgression_genes,10:12] = counts[ZZY10330_introgression_genes,10:12]
+counts_merge[ZZY10307_introgression_genes,7:9] = counts[ZZY10307_introgression_genes,7:9] #changing readcounts of both hybrids in the counts_merge file
+counts_merge[ZZY10330_introgression_genes,10:12] = counts[ZZY10330_introgression_genes,10:12] 
+
+nrow(counts_merge_ZZY10307_h2)
+nrow(counts_merge_ZZY10330_h1)
+# Display column names
+colnames(counts_merge)
+```
+
+##F. Saving the count data in the right format to be used for downstream analyses
+```{r}
+##Saving Cni and Cbr orthologous genes
+write.csv(counts_merge_ZZY10307_h2, "../3-Output/AZZY10307_H2_foranalysis.csv")
+write.csv(counts_merge_ZZY10330_h1, "../3-Output/ZZY10330_h1_foranalysis.csv")
+
+```
+
+#2. DIFFERENTIAL GENE EXPRESSION ANALYSIS
+##A. Preparing coldata for DESeq2
+```{r}
+
+# Remove rows with NA values and extract column names
+counts_merge <- na.omit(counts_merge)
+samples <- colnames(counts_merge)
+
+# Create a data frame with sample metadata
+coldata <- data.frame(
+  samples = samples,
+  #group = rep(1:3, length.out = length(samples)),
+  group = samples,
+  mapped_to = sapply(strsplit(samples, "-", fixed = TRUE), function(x) x[2]),
+  #alternatively, mapped_to = sub("^[^-]*-", "", samples),
+  species = "Cbr",
+  stringsAsFactors = FALSE
+)
+
+# Remove numbers from the 'mapped_to' column
+coldata$mapped_to <- gsub("\\d+", "", coldata$mapped_to) 
+#matches any sequence of one or more digits in a string
+
+# Update species based on sample names
+coldata$species[grepl("Cni-Cni", samples)] <- "Cni"
+coldata$species[grepl("H2", samples)] <- "ZZY10307_h2"
+coldata$species[grepl("H1", samples)] <- "ZZY10330_h1"
+#coldata$group = as.factor(coldata$group)
+# Display the final data frame
+coldata
+
+```
+##B. Filtering out reads/genes with very low readcounts
+```{r}
+# Create DESeqDataSet objects and estimate size factors
+dds_ZZY10307 <- DESeqDataSetFromMatrix(countData = counts_merge_ZZY10307_h2, colData = coldata, design = ~group) %>%
+  estimateSizeFactors()
+dds_ZZY10330 <- DESeqDataSetFromMatrix(countData = counts_merge_ZZY10330_h1, colData = coldata, design = ~group) %>%
+  estimateSizeFactors()
+
+# Filter genes based on normalized counts
+filter_in_ZZY10307 <- rowSums(counts(dds_ZZY10307, normalized = TRUE) >= 10) >= 3
+filter_in_ZZY10330 <- rowSums(counts(dds_ZZY10330, normalized = TRUE) >= 10) >= 3
+
+# Combine filtered genes so that final comparison between hybrid lines is comparable
+filter_in <- filter_in_ZZY10307 & filter_in_ZZY10330
+
+# Apply filter to counts data
+counts_filt_ZZY10307 <- counts_merge_ZZY10307_h2[filter_in, ]
+counts_filt_ZZY10330 <- counts_merge_ZZY10330_h1[filter_in, ]
+
+# Output number of rows in filtered data
+nrow(counts_filt_ZZY10330)
+
+```
+
+##C. Exclude non-syntenic genes
+```{r}
+# orthologs that are not fully syntenic
+# these genes are C. nigoni orthologs that are found outside the introgression
+# are are likely to be duplicated in hybrids
+not_syntenic = c("WBGene00031948__Cnig_chr_X.g25393",
+                 "WBGene00030620__Cnig_chr_X.g25246",
+                 "WBGene00035117__Cnig_chr_X.g24771",
+                 "WBGene00036902__Cnig_chr_X.g22297",
+                 "WBGene00304234__Cnig_chr_X.g23692",
+                 "WBGene00025157__Cnig_chr_X.g23082",
+                 "WBGene00036902__Cnig_chr_X.g22297")
+# exclude non-syntenic
+counts_filt_ZZY10307 = counts_filt_ZZY10307[ !rownames(counts_filt_ZZY10307) %in% not_syntenic, ]
+counts_filt_ZZY10330 = counts_filt_ZZY10330[ !rownames(counts_filt_ZZY10330) %in% not_syntenic, ]
+
+
+```
+
+##D. Performing differential gene expression analysis
+###1. Between C. briggsae and C. nigoni
+```{r}
+keep = coldata$species == "Cbr" | coldata$species == "Cni"
+dds_1 = DESeqDataSetFromMatrix(
+  countData = counts_filt_ZZY10307[,keep], 
+  colData = coldata[keep,], 
+  design = ~species
+  ) %>% DESeq()
+
+#getting results and adding a column based on p-adj values
+dds.species = results(dds_1) %>% 
+  as.data.frame() %>% 
+  mutate(Cni.Cbr = ifelse(padj > 0.05, 0, ifelse(log2FoldChange > 0, 1, -1)))
+
+#filtering upregulated and downregulated genes
+Cni.Cbr.up <- rownames(subset(dds.species, dds.species$Cni.Cbr == 1))
+Cni.Cbr.down <- rownames(subset(dds.species, dds.species$Cni.Cbr == -1))
+Cni.Cbr.no_change <- rownames(subset(dds.species, dds.species$Cni.Cbr == 0))
+
+summary(Cni.Cbr.down)
+summary(Cni.Cbr.up)
+summary(Cni.Cbr.no_change)
+```
+###2. Between C. nigoni and hybrid ZZY10307 H2
+```{r}
+keep = coldata$species == "Cni" | coldata$species == "ZZY10307_h2"
+dds_2 = DESeqDataSetFromMatrix(
+  countData = counts_filt_ZZY10307[,keep], 
+  colData = coldata[keep,], 
+  design = ~species
+  ) %>% DESeq()
+
+#getting results and adding a column based on p-adj values
+dds.Cni.ZZY10307  = results(dds_2) %>% 
+  as.data.frame() %>% 
+  mutate(Cni.ZZY10307_h2 = ifelse(padj > 0.05, 0, ifelse(log2FoldChange > 0, 1, -1)))
+
+#filtering upregulated and downregulated genes
+Cni.ZZY10307.up <- rownames(subset(dds.Cni.ZZY10307, dds.Cni.ZZY10307$Cni.ZZY10307_h2 == 1))
+Cni.ZZY10307.down <- rownames(subset(dds.Cni.ZZY10307, dds.Cni.ZZY10307$Cni.ZZY10307_h2 == -1))
+Cni.ZZY10307.no_change <- rownames(subset(dds.Cni.ZZY10307, dds.Cni.ZZY10307$Cni.ZZY10307_h2 == 0))
+
+summary(Cni.ZZY10307.up)
+summary(Cni.ZZY10307.down)
+summary(Cni.ZZY10307.no_change)
+table(dds.Cni.ZZY10307$Cni.ZZY10307_h2)
+```
+###3. between C. nigoni and hybrid ZZY10330 H1
+```{r}
+keep = coldata$species == "Cni" | coldata$species == "ZZY10330_h1"
+dds_3 = DESeqDataSetFromMatrix(
+  countData = counts_filt_ZZY10330[,keep], 
+  colData = coldata[keep,], 
+  design = ~species
+  ) %>% DESeq()
+
+#getting results and adding a column based on p-adj values
+dds.Cni.ZZY10330  = results(dds_3) %>% 
+  as.data.frame() %>% 
+  mutate(Cni.ZZY10330_h1 = ifelse(padj > 0.05, 0, ifelse(log2FoldChange > 0, 1, -1)))
+
+#filtering upregulated and downregulated genes
+Cni.ZZY10330.up <- rownames(subset(dds.Cni.ZZY10330, dds.Cni.ZZY10330$Cni.ZZY10330_h1 == 1))
+Cni.ZZY10330.down <- rownames(subset(dds.Cni.ZZY10330, dds.Cni.ZZY10330$Cni.ZZY10330_h1 == -1))
+Cni.ZZY10330.no_change <- rownames(subset(dds.Cni.ZZY10330, dds.Cni.ZZY10330$Cni.ZZY10330_h1 == 0))
+
+summary(Cni.ZZY10330.up)
+summary(Cni.ZZY10330.down)
+summary(Cni.ZZY10330.no_change)
+table(dds.Cni.ZZY10330$Cni.ZZY10330_h1)
+```
+###4. Between C. briggsae and hybrid ZZY10307
+```{r}
+keep = coldata$species == "Cbr" | coldata$species == "ZZY10307_h2"
+dds_4 = DESeqDataSetFromMatrix(
+  countData = counts_filt_ZZY10307[,keep], 
+  colData = coldata[keep,], 
+  design = ~species) %>% 
+  DESeq()
+#getting results and adding a column based on p-adj values
+dds.Cbr.ZZY10307 = results(dds_4) %>% 
+  as.data.frame() %>% 
+  mutate(Cbr.ZZY10307_h2 = ifelse(padj > 0.05, 0, ifelse(log2FoldChange > 0, 1, -1)))
+
+#filtering upregulated and downregulated genes
+Cbr.ZZY10307.up <- rownames(subset(dds.Cbr.ZZY10307, dds.Cbr.ZZY10307$Cbr.ZZY10307_h2 == 1))
+Cbr.ZZY10307.down <- rownames(subset(dds.Cbr.ZZY10307, dds.Cbr.ZZY10307$Cbr.ZZY10307_h2 == -1))
+Cbr.ZZY10307.no_change <- rownames(subset(dds.Cbr.ZZY10307, dds.Cbr.ZZY10307$Cbr.ZZY10307_h2 == 0))
+
+summary(Cbr.ZZY10307.up)
+summary(Cbr.ZZY10307.down)
+summary(Cbr.ZZY10307.no_change)
+table(dds.Cbr.ZZY10307$Cbr.ZZY10307_h2)
+
+```
+###5. Between C. briggsae and hybrid ZZY10330
+```{r}
+keep = coldata$species == "Cbr" | coldata$species == "ZZY10330_h1"
+dds_5 = DESeqDataSetFromMatrix(
+  countData = counts_filt_ZZY10330[,keep], 
+  colData = coldata[keep,], 
+  design = ~species) %>% 
+  DESeq()
+#getting results and adding a column based on p-adj values
+dds.Cbr.ZZY10330 = results(dds_5) %>% 
+  as.data.frame() %>% 
+  mutate(Cbr.ZZY10330_h1 = ifelse(padj > 0.05, 0, ifelse(log2FoldChange > 0, 1, -1)))
+
+#filtering upregulated and downregulated genes
+Cbr.ZZY10330.up <- rownames(subset(dds.Cbr.ZZY10330, dds.Cbr.ZZY10330$Cbr.ZZY10330_h1 == 1))
+Cbr.ZZY10330.down <- rownames(subset(dds.Cbr.ZZY10330, dds.Cbr.ZZY10330$Cbr.ZZY10330_h1 == -1))
+Cbr.ZZY10330.no_change <- rownames(subset(dds.Cbr.ZZY10330, dds.Cbr.ZZY10330$Cbr.ZZY10330_h1 == 0))
+
+summary(Cbr.ZZY10330.up)
+summary(Cbr.ZZY10330.down)
+summary(Cbr.ZZY10330.no_change)
+table(dds.Cbr.ZZY10330$Cbr.ZZY10330_h1)
+```
+
+#3. CONSOLIDATING DIFFERENTIAL GENE EXPRESSION RESULTS
+between species: 0=Non DE, -1=Cbr upregulated in Cbr, 1=Cni, upregulated in Cni
+hybrids: 0=Non DE, -1=species upregulated, 1=hybrid upregulated
+```{r}
+#################################
+##Results for Introgression region
+#################################
+# Create data frames with selected columns
+dds.introgression.ZZY10307 = data.frame(
+  dds.species["Cni.Cbr"], 
+  dds.Cbr.ZZY10307["Cbr.ZZY10307_h2"], 
+  dds.Cni.ZZY10307["Cni.ZZY10307_h2"])#taking the newly created columns together
+
+dds.introgression.ZZY10330 = data.frame(
+  dds.species["Cni.Cbr"], 
+  dds.Cbr.ZZY10330["Cbr.ZZY10330_h1"], 
+  dds.Cni.ZZY10330["Cni.ZZY10330_h1"])
+# Filter and remove NA values based on introgression status
+dds.introgression.ZZY10307 = na.omit(dds.introgression.ZZY10307[rownames(introgressions)[ introgressions$introgression == "ZZY10307_h2" ], ])
+dds.introgression.ZZY10330 = na.omit(dds.introgression.ZZY10330[rownames(introgressions)[ introgressions$introgression == "ZZY10330_h1" ], ])
+
+#################################
+##Results for background genes
+#################################
+# Create data frames with selected columns
+dds.background.ZZY10307 = data.frame(
+  dds.species["Cni.Cbr"], 
+  dds.Cbr.ZZY10307["Cbr.ZZY10307_h2"], 
+  dds.Cni.ZZY10307["Cni.ZZY10307_h2"])
+
+
+dds.background.ZZY10330 = data.frame(
+  dds.species["Cni.Cbr"], 
+  dds.Cbr.ZZY10330["Cbr.ZZY10330_h1"], 
+  dds.Cni.ZZY10330["Cni.ZZY10330_h1"])
+
+# Filter and remove NA values based on introgression status
+dds.background.ZZY10307 = na.omit(dds.background.ZZY10307[rownames(introgressions)[ introgressions$introgression != "ZZY10307_h2" ], ])
+dds.background.ZZY10330 = na.omit(dds.background.ZZY10330[rownames(introgressions)[ introgressions$introgression != "ZZY10330_h1" ], ])
+
+```
+These dataframes will be then used to perform a 3-way comparison to categorize genes into different inheritance and rergulatory divergence categories
+
+#4. FUNCTIONS TO USE FOR CLASSIFYING GENES INTO INHERITANCE AND REGULATORY DIVERGENCE CATEGORIES
+```{r}
+# functions use to classify expression inheritance and expression divergence
+classify_introgression <- function(x, type="cis-trans"){
+  y = paste(x[,1], x[,2], x[,3])
+  cl = rep(NA, dim(x)[1])
+  if (type == "cis-trans"){
+    cl[ y == "-1 0 1"] = "cis-only local" #comparing 3 columns in dds file, for introgressed genes mapped to Cbrig in hybrid
+    cl[ y == "1 0 -1"] = "cis-only local" ## 3 number are : Cbr x Cni (in terms of Cni), Cbr x h (in terms of h), Cni x h (interms of H)
+    cl[ y == "-1 -1 0"] = "trans-only distal"
+    cl[ y == "1 1 0"] = "trans-only distal"
+    cl[ y == "0 1 1"] = "cis-trans compensatory"
+    cl[ y == "0 -1 -1"] = "cis-trans compensatory"
+    cl[ y == "-1 1 1"] = "cis-trans combinatory" # Cbr high, Hybrid higher
+    cl[ y == "1 1 1"] = "cis-trans combinatory" #  Cni high, Hybrid higher
+    cl[ y == "-1 -1 -1"] = "cis-trans combinatory"
+    cl[ y == "1 -1 -1"] = "cis-trans combinatory"
+    cl[ y == "1 1 -1"] = "cis-trans combinatory" # additive
+    cl[ y == "-1 -1 1"] = "cis-trans combinatory" # additive
+    cl[ y == "0 0 0"] = "conserved"
+    cl[ is.na(cl) ] = "ambiguous"
+    return(cl)
+  }
+  else if (type == "inheritance"){
+    cl[ y == "-1 0 1"] = "C. briggsae dominant up"
+    cl[ y == "1 0 -1"] = "C. briggsae dominant down"
+    cl[ y == "-1 -1 0"] = "C. nigoni dominant" 
+    cl[ y == "1 1 0"] = "C. nigoni dominant"
+    cl[ y == "0 1 1"] = "overdominant"
+    cl[ y == "-1 1 1"] = "overdominant"
+    cl[ y == "1 1 1"] = "overdominant"
+    cl[ y == "0 -1 -1"] = "underdominant"
+    cl[ y == "-1 -1 -1"] = "underdominant"
+    cl[ y == "1 -1 -1"] = "underdominant"
+    cl[ y == "1 1 -1"] = "additive down"
+    cl[ y == "-1 -1 1"] = "additive up"
+    cl[ y == "0 0 0"] = "no change"
+    cl[ is.na(cl) ] = "ambiguous"
+    return(cl)
+  }
+}
+
+classify_background <- function(x, type="cis-trans"){
+  y = paste(x[,1], x[,2], x[,3])
+  cl = rep(NA, dim(x)[1])
+  if (type == "cis-trans"){
+    cl[ y == "-1 0 1"] = "C. briggsae directional trans up" #different classification terms for background genes
+    cl[ y == "1 0 -1"] = "C. briggsae directional trans down"
+    cl[ y == "-1 -1 0"] = "no effect"
+    cl[ y == "1 1 0"] = "no effect"
+    cl[ y == "0 1 1"] = "compensatory trans up"
+    cl[ y == "0 -1 -1"] = "compensatory trans down"
+    cl[ y == "-1 1 1"] = "C. briggsae partial trans up" # Cbr high, Hybrid higher
+    cl[ y == "1 1 1"] = "C. briggsae partial trans up" #  Cni high, Hybrid higher
+    cl[ y == "-1 -1 -1"] = "C. briggsae partial trans down"
+    cl[ y == "1 -1 -1"] = "C. briggsae partial trans down"
+    cl[ y == "1 1 -1"] = "C. briggsae partial trans down" # additive
+    cl[ y == "-1 -1 1"] = "C. briggsae partial trans up" # additive
+    cl[ y == "0 0 0"] = "conserved"
+    cl[ is.na(cl) ] = "ambiguous"
+    return(cl)
+  }
+  else if (type == "inheritance"){
+    cl[ y == "-1 0 1"] = "C. briggsae dominant up"
+    cl[ y == "1 0 -1"] = "C. briggsae dominant down"
+    cl[ y == "-1 -1 0"] = "C. nigoni dominant"
+    cl[ y == "1 1 0"] = "C. nigoni dominant"
+    cl[ y == "0 1 1"] = "overdominant"
+    cl[ y == "-1 1 1"] = "overdominant"
+    cl[ y == "1 1 1"] = "overdominant"
+    cl[ y == "0 -1 -1"] = "underdominant"
+    cl[ y == "-1 -1 -1"] = "underdominant"
+    cl[ y == "1 -1 -1"] = "underdominant"
+    cl[ y == "1 1 -1"] = "additive down"
+    cl[ y == "-1 -1 1"] = "additive up"
+    cl[ y == "0 0 0"] = "no change"
+    cl[ is.na(cl) ] = "ambiguous"
+    return(cl)
+  }
+}
+
+```
+
+#5. CLASSIFYING GENES INTO DIFFERENT CATEGORIES AND CONSOLIDATING RESULTS
+##A. Classification of genes inside introgression
+```{r}
+#Classify regulatory divergence
+dds.introgression.ZZY10307$cis_trans = classify_introgression(dds.introgression.ZZY10307, type="cis-trans")
+dds.introgression.ZZY10330$cis_trans = classify_introgression(dds.introgression.ZZY10330, type="cis-trans")
+#classify inheritance
+dds.introgression.ZZY10307$inheritance = classify_introgression(dds.introgression.ZZY10307, type="inheritance")
+dds.introgression.ZZY10330$inheritance = classify_introgression(dds.introgression.ZZY10330, type="inheritance")
+
+# Add log fold change values
+#since the final result file only gives fold change as 0,1,-1, this column gives the exact value of foldchange
+#Cbr vs HILs
+dds.introgression.ZZY10307$logFC.ZZY10307.vs.Cbr = dds.Cbr.ZZY10307[ rownames(dds.introgression.ZZY10307), "log2FoldChange" ] 
+dds.introgression.ZZY10330$logFC.ZZY10330.vs.Cbr = dds.Cbr.ZZY10330[ rownames(dds.introgression.ZZY10330), "log2FoldChange" ]
+#Cni vs HILs
+dds.introgression.ZZY10307$logFC.ZZY10307.vs.Cni = dds.Cni.ZZY10307[ rownames(dds.introgression.ZZY10307), "log2FoldChange" ]
+dds.introgression.ZZY10330$logFC.ZZY10330.vs.Cni = dds.Cni.ZZY10330[ rownames(dds.introgression.ZZY10330), "log2FoldChange" ]
+#Cni vs Cbr
+dds.introgression.ZZY10307$logFC.species = dds.species[ rownames(dds.introgression.ZZY10307), "log2FoldChange" ]
+dds.introgression.ZZY10330$logFC.species = dds.species[ rownames(dds.introgression.ZZY10330), "log2FoldChange" ]
+
+# Add position and chromosome information
+dds.introgression.ZZY10307$position = introgressions[ rownames(dds.introgression.ZZY10307), "Start"]
+dds.introgression.ZZY10330$position = introgressions[ rownames(dds.introgression.ZZY10330), "Start"]
+##looking at Chr column in introgressions for rownames in dds.introgression.ZZY10307 and putting it through Chr_ni to get chromsomal location
+# C. nigoni chromosomes
+Chr_ni = c(CM008509.1="I", CM008510.1="II", CM008511.1="III", CM008512.1="IV", CM008513.1="V", CM008514.1="X")
+dds.introgression.ZZY10307$chromosome = Chr_ni[ introgressions[ rownames(dds.introgression.ZZY10307), "Chr"] ] 
+dds.introgression.ZZY10330$chromosome = Chr_ni[ introgressions[ rownames(dds.introgression.ZZY10330), "Chr"] ]
+
+# Add introgression/HIL name
+dds.introgression.ZZY10307$introgression = "ZZY10307"
+dds.introgression.ZZY10330$introgression = "ZZY10330"
+
+##output
+head(dds.introgression.ZZY10307)
+head(dds.introgression.ZZY10330)
+```
+
+##B. Classification of genes in the background (outside introrgession)
+```{r}
+#Classify regulatory divergence
+dds.background.ZZY10307$cis_trans = classify_background(dds.background.ZZY10307, type="cis-trans")
+dds.background.ZZY10330$cis_trans = classify_background(dds.background.ZZY10330, type="cis-trans")
+#classify inheritance
+dds.background.ZZY10307$inheritance = classify_background(dds.background.ZZY10307, type="inheritance")
+dds.background.ZZY10330$inheritance = classify_background(dds.background.ZZY10330, type="inheritance")
+# Add log fold change values
+#since the final result file only gives fold change as 0,1,-1, this column gives the exact value of foldchange
+#Cbr vs HILs
+dds.background.ZZY10307$logFC.ZZY10307.vs.Cbr = dds.Cbr.ZZY10307[ rownames(dds.background.ZZY10307), "log2FoldChange" ]
+dds.background.ZZY10330$logFC.ZZY10330.vs.Cbr = dds.Cbr.ZZY10330[ rownames(dds.background.ZZY10330), "log2FoldChange" ]
+#Cni vs HILs
+dds.background.ZZY10307$logFC.ZZY10307.vs.Cni = dds.Cni.ZZY10307[ rownames(dds.background.ZZY10307), "log2FoldChange" ]
+dds.background.ZZY10330$logFC.ZZY10330.vs.Cni = dds.Cni.ZZY10330[ rownames(dds.background.ZZY10330), "log2FoldChange" ]
+#Cni vs Cbr
+dds.background.ZZY10307$logFC.species = dds.species[ rownames(dds.background.ZZY10307), "log2FoldChange" ]
+dds.background.ZZY10330$logFC.species = dds.species[ rownames(dds.background.ZZY10330), "log2FoldChange" ]
+
+# Add position and chromosome information
+dds.background.ZZY10307$position = introgressions[ rownames(dds.background.ZZY10307), "Start"]
+dds.background.ZZY10330$position = introgressions[ rownames(dds.background.ZZY10330), "Start"]
+##looking at Chr column in introgressions for rownames in dds.introgression.ZZY10307 and putting it through Chr_ni to get chromsomal location
+# C. nigoni chromosomes
+Chr_ni = c(CM008509.1="I", CM008510.1="II", CM008511.1="III", CM008512.1="IV", CM008513.1="V", CM008514.1="X")
+dds.background.ZZY10307$chromosome = Chr_ni[ introgressions[ rownames(dds.background.ZZY10307), "Chr"] ]
+dds.background.ZZY10330$chromosome = Chr_ni[ introgressions[ rownames(dds.background.ZZY10330), "Chr"] ]
+# Add introgression/HIL name
+dds.background.ZZY10307$introgression = "C. nigoni background"
+dds.background.ZZY10330$introgression = "C. nigoni background"
+
+##output
+head(dds.background.ZZY10307)
+head(dds.background.ZZY10330)
+```
+
+##C. Consolidating resutls
+```{r}
+# integrate both into a single data frame
+dds.ZZY10307 = rbind(dds.background.ZZY10307, dds.introgression.ZZY10307)
+dds.ZZY10330 = rbind(dds.background.ZZY10330, dds.introgression.ZZY10330)
+
+####Making file with all the data about introgressions
+dds.ZZY10330[introgression_ZZY10307_h2,"introgression"] = "ZZY10307"  #marking genes present in other introgression, now the file has both introgressions marked in both lines
+dds.ZZY10330 = na.omit(dds.ZZY10330)
+
+dds.ZZY10307[introgression_ZZY10330_h1,"introgression"] = "ZZY10330" #marking genes present in other introgression, now the file has both introgressions marked in both lines
+dds.ZZY10307 = na.omit(dds.ZZY10307)
+```
+
+#6. INVESTIGATING THE CLASSIFIED GENES FOR FURTHER ANALYSES
+##A MAKING CUMULATIVE INHERITANCE CATEGORIES
+```{r}
+inheritance_labels <- c(
+  "C. briggsae dominant up" = "Cbr dominant",
+  "C. briggsae dominant down" = "Cbr dominant",
+  "additive down" = "Additive",
+  "additive up" = "Additive",
+  "C. nigoni dominant" = "Cni dominant",
+  "overdominant" = "Overdominant",
+  "underdominant" = "Underdominant",
+  "no change" = "No change",
+  "ambiguous" = "Ambiguous"
+)
+#HYBRID LINE 1 ZZY10330
+#Initialize `Inheritance_sum` with a default value
+dds.ZZY10330$Inheritance_sum <- "AALL"
+
+# Map the values in `dds.ZZY10307$inheritance` to their corresponding labels
+dds.ZZY10330$Inheritance_sum <- inheritance_labels[dds.ZZY10330$inheritance]
+
+# Display the frequency table of the mapped categories (if needed)
+table(dds.ZZY10330$Inheritance_sum)
+
+##HYBRID LINE 2 ZZY10307
+#Initialize `Inheritance_sum` with a default value
+dds.ZZY10307$Inheritance_sum <- "AALL"
+
+# Map the values in `dds.ZZY10307$inheritance` to their corresponding labels
+dds.ZZY10307$Inheritance_sum <- inheritance_labels[dds.ZZY10307$inheritance]
+
+# Display the frequency table of the mapped categories (if needed)
+table(dds.ZZY10307$Inheritance_sum)
+```
+
+##B MAKING CUMULATIVE REGULATORY DIVERGENCE CATEGORIES
+```{r}
+
+# Define the mapping of cis_trans categories to descriptive labels
+cis_trans_labels <- c(
+  "C. briggsae directional trans down" = "trans-only",
+  "C. briggsae directional trans up" = "trans-only",
+  "C. briggsae partial trans down" = "cis-trans",
+  "C. briggsae partial trans up" = "cis-trans",
+  "no effect" = "No change",
+  "compensatory trans up" = "Compensatory",
+  "compensatory trans down" = "Compensatory",
+  "conserved" = "Conserved",
+  "ambiguous" = "Ambiguous",
+  "cis-only local" = "Cis-only local",
+  "trans-only distal" = "trans-only distal",
+  "cis-trans compensatory" = "cis-trans compensatory",
+  "cis-trans combinatory" = "cis-trans combinatory"
+)
+
+#HYBRID LINE 1 ZZY10330
+# Initialize `cis_trans_sum` with a default value
+dds.ZZY10330$cis_trans_sum <- "AALL"
+
+# Map the values in `dds.ZZY10330$cis_trans` to their corresponding labels
+dds.ZZY10330$cis_trans_sum <- cis_trans_labels[dds.ZZY10330$cis_trans]
+
+# Display the frequency table of the mapped categories
+table(dds.ZZY10330$cis_trans_sum)
+
+#HYBRID LINE 2 ZZY10307
+# Initialize `cis_trans_sum` with a default value
+dds.ZZY10307$cis_trans_sum <- "AALL"
+
+# Map the values in `dds.ZZY10307$cis_trans` to their corresponding labels
+dds.ZZY10307$cis_trans_sum <- cis_trans_labels[dds.ZZY10307$cis_trans]
+
+# Display the frequency table of the mapped categories (if needed)
+table(dds.ZZY10307$cis_trans_sum)
+
+```
+
+##C SUBSETTING SPECIFIC GENES
+```{r}
+#SUBSETTING LINE SPECIFIC GENES##############################
+# Extract row names (gene names) from both datasets
+genenames_330 <- rownames(dds.ZZY10330)
+genenames_307 <- rownames(dds.ZZY10307)
+
+# Find genes unique to each dataset
+extra_330_genenames <- setdiff(genenames_330, genenames_307)
+extra_307_genenames <- setdiff(genenames_307, genenames_330)
+
+# Subset datasets based on unique genes
+specific_genes_330 <- dds.ZZY10330[extra_330_genenames, ]
+specific_genes_307 <- dds.ZZY10307[extra_307_genenames, ]
+
+# Summarize the unique gene names
+summary(rownames(specific_genes_330))
+summary(rownames(specific_genes_307))
+summary(intersect(genenames_330, genenames_307))
+
+#output
+write.csv(specific_genes_307, "../3-Output/HIL2 Specific genes.csv")
+write.csv(specific_genes_330, "../3-Output/HIL1 Specific genes.csv")
+
+#SUBSETTING COMMON GENES ##############################
+# Find common gene names between the two datasets
+all_commongenes <- intersect(genenames_330, genenames_307)
+
+# Subset datasets to include only the common genes
+allcommon_genes_330 <- dds.ZZY10330[all_commongenes, ]
+allcommon_genes_307 <- dds.ZZY10307[all_commongenes, ]
+
+#Number of common genes across HILs
+nrow(allcommon_genes_330)
+nrow(allcommon_genes_307)
+
+######Make a cumulative data frame for all the common genes adding both lines
+
+Totaldata_common_genes=merge(allcommon_genes_330, allcommon_genes_307, by=0, all="TRUE") ##genes present inside and outside introgression
+row.names(Totaldata_common_genes)= Totaldata_common_genes$Row.names  ###changing row names
+Totaldata_common_genes$Row.names=NULL #removing Row.names column
+colnames(Totaldata_common_genes) #.x is HIL1/330, .y is HIL2 307
+
+# Subset to include only genes in the common C. nigoni background
+all_common_bg_genes = subset(Totaldata_common_genes, (Totaldata_common_genes$introgression.x == "C. nigoni background" & Totaldata_common_genes$introgression.x == Totaldata_common_genes$introgression.y)) 
+##genes in the common C.nigoni background - including Autosomes and X
+
+# Display the count and column names of the subset
+table(Totaldata_common_genes$introgression.y)
+nrow(all_common_bg_genes)
+colnames(all_common_bg_genes)
+
+#write the results to CSV files
+write.csv(Totaldata_common_genes,"../3-Output/Total Data for common genes.csv")
+write.csv(all_common_bg_genes,"../3-Output/Common_bg_genes.csv")
+write.csv(dds.ZZY10330, "../3-Output/HIL1_alldata.csv")
+write.csv(dds.ZZY10307, "../3-Output/HIL2_alldata.csv")
+```
+
+##D SUBSETTING DOWNREGULATED AND UPREGULATED GENES
+```{r}
+###Looking at downregulated genes
+#HIL1 ZZY10330
+# Filter rows in dds.ZZY10330 based on inheritance types
+total_down_330_df <- subset(dds.ZZY10330, inheritance %in% c("C. briggsae dominant down", "additive down", "underdominant"))
+total_down_330_names <- rownames(total_down_330_df)
+# Get row names for the specified inheritance types in the C. nigoni background
+down_commonbg_330_names <- rownames(subset(dds.ZZY10330, inheritance %in% c("C. briggsae dominant down", "additive down", "underdominant") & introgression == "C. nigoni background"))
+
+#HIL2 ZZY10307
+# Filter rows in dds.ZZY10307 based on inheritance types
+total_down_307_df <- subset(dds.ZZY10307, inheritance %in% c("C. briggsae dominant down", "additive down", "underdominant"))
+total_down_307_names <- rownames(total_down_307_df)
+# Get row names for the specified inheritance types in dds.ZZY10307 with the same background
+down_commonbg_307_names <- rownames(subset(dds.ZZY10307, inheritance %in% c("C. briggsae dominant down", "additive down", "underdominant") & introgression == "C. nigoni background"))
+
+#overlapping genes
+total.common_down=total_down_330_names[total_down_330_names %in% total_down_307_names]
+total.common.down.330.df=total_down_330_df[total.common_down, ] # data only for the common genes
+total.common.down.307.df=total_down_307_df[total.common_down, ]
+
+###Cumulative data for common_down genes
+Total_overlap_down=merge(total.common.down.330.df, total.common.down.307.df, by=0, all="TRUE")
+row.names(Total_overlap_down)= Total_overlap_down$Row.names  ###changing row names
+Total_overlap_down$Row.names=NULL #Removing Row.names column
+nrow(Total_overlap_down)
+head(Total_overlap_down)
+
+
+##################Looking at upregulated genes
+#HIL1 ZZY10330
+# Filter rows in dds.ZZY10330 based on inheritance types
+total_up_330_df=subset(dds.ZZY10330, inheritance %in% c ("C. briggsae dominant (up)", "additive (up)", "overdominant"))
+total_up_330_names=rownames(total_up_330_df)
+# Get row names for the specified inheritance types in the C. nigoni background
+up_commonbg_330_names = rownames(subset(dds.ZZY10330, inheritance %in% c("C. briggsae dominant up", "additive up", "overdominant") & dds.ZZY10330$introgression == "C. nigoni background" ))
+
+#HIL2 ZZY10307
+# Filter rows in dds.ZZY10307 based on inheritance types
+total_up_307_df=subset(dds.ZZY10307, inheritance %in% c("C. briggsae dominant (up)","additive (up)", "overdominant"))
+total_up_307_names=rownames(total_up_307_df)
+# Get row names for the specified inheritance types in dds.ZZY10307 with the same background
+up_commonbg_307_names = rownames(subset(dds.ZZY10307, inheritance %in% c("C. briggsae dominant up","additive up", "overdominant") & dds.ZZY10307$introgression == "C. nigoni background" ))
+
+#overlapping genes
+total.common_up=total_up_330_names[total_up_330_names %in% total_up_307_names]
+total.common.up.330.df=total_up_330_df[total.common_up, ] # data only for the common genes
+total.common.up.307.df=total_up_307_df[total.common_up, ]
+
+###Cumulative data for common_up genes
+Total_overlap_up=merge(total.common.up.330.df, total.common.up.307.df, by=0, all="TRUE")
+row.names(Total_overlap_up)= Total_overlap_up$Row.names  ###changing row names
+Total_overlap_up$Row.names=NULL #Removing Row.names column
+nrow(Total_overlap_up)
+head(Total_overlap_up)
+```
+
+##E SUBSETTING CONSERVED GENES
+```{r}
+####Overlapping conserved/ambiguous genes
+#in 330
+constant.330.df=subset(dds.ZZY10330, inheritance %in% c("no change", "ambiguous", "C. nigoni dominant"))
+constant.330.names=rownames(constant.330.df)
+summary(rownames(constant.330.df))
+summary(unique(constant.330.names))
+
+
+#in 307
+constant.307.df=subset(dds.ZZY10307, inheritance %in% c("no change","ambiguous","C. nigoni dominant"))
+constant.307.names=rownames(constant.307.df)
+summary(unique(constant.307.names))
+summary(unique(rownames(constant.307.df)))
+
+
+#overlapping constant genes
+constant.common=constant.330.names[constant.330.names %in% constant.307.names]
+constant.common.330.df=constant.330.df[constant.common, ] # data only for the common genes
+constant.common.307.df=constant.307.df[constant.common, ]
+nrow(constant.common.307.df)
+
+###Cumulative data for common constant genes
+Total_overlap_constant=merge(constant.common.330.df, constant.common.307.df, by=0, all="TRUE")
+row.names(Total_overlap_constant)= Total_overlap_constant$Row.names  ###changing row names
+Total_overlap_constant$Row.names=NULL
+nrow(Total_overlap_constant)
+head(Total_overlap_constant)
+```
+
+
+
+

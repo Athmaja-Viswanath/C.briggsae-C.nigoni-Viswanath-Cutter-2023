@@ -1,0 +1,276 @@
+---
+title: "Preliminary Figures"
+author: "Athmaja Viswa"
+date: "2024-08-31"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+These are preliminary figures that are made using the data. These figures were then customized using Adobe Illustrator to make the final versions of the figure in the publication Viswanath, Athmaja, and Asher D. Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
+
+#0. LOADING REQUIRED PACKAGES
+
+```{r cars}
+options(scipen=999)  # turn off scientific notation like 1e+06
+library(grid)
+library(futile.logger)
+library(tibble)
+library(VennDiagram)
+library(ggplot2)
+
+#saving different colour pallets
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+myPalette = c("#B775B1", "#85C0F9", "#63ACBE", "#FDED2A", "#F5793A")
+myPalette_1= c( "#ED5094", "#FCCB1A","#2292BF")
+scatter_palette = c("#009E73", "#56B4E9", "black","#961E51","#CC79A7" )
+
+```
+
+#1. FIGURE 1
+Figure one was made using Adobe Illustrator
+
+##2. FIGURE 2
+##A. Overall gene expression categories
+NOTE: Fig2A_1 and Fig2A_2 were super imposed to get the final figure 1A 
+```{r pressure, echo=FALSE}
+##Data from DGE_Analysis.Rmd
+table(dds.ZZY10307$Inheritance_sum, dds.ZZY10307$introgression)
+table(dds.ZZY10330$Inheritance_sum, dds.ZZY10330$introgression)
+
+#Creating a dataframe with different number of genes in three categories across HIL1 and HIL2
+Fig2A_1=data.frame(Group = c(rep("Differentially expressed", 2), rep("C. nigoni dominant", 2), rep("Conserved", 2), rep("Ambiguous", 2)),
+               L1= c(2229, 2543, 1124, 1450, 5207, 4803, 1913, 1745), Line = rep(c("HI Line 1", "HI Line 2"), 4))
+
+##Barplot using ggplot
+ggplot(Fig2A_1, aes(x=Group, y=L1, fill = Line))+
+  geom_bar(stat = "identity", show.legend=T, alpha=1, position = "dodge", colour = "black")+
+  xlab(" ")+ 
+  ylab("Number of genes")+
+  theme(plot.title = element_text(size = 26, face = "bold", hjust = 0.5, vjust = 0.5))+
+  coord_cartesian(ylim = c(0, 6000))+
+  scale_fill_manual(values = c("#807673", "#E6E6E6"))+theme(axis.title.y = element_text(size = 14, hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 16.5))+
+  theme(axis.text.y = element_text(size = 10))+
+  theme(axis.title.x = element_text(size = 14))+
+  theme(axis.title.y = element_text(size = 20, hjust = 0.5))+
+  theme(axis.text.y = element_text(face="bold", color="black", size=15))+
+  guides(fill=guide_legend(title=" "))+
+  scale_x_discrete(limits = c("Conserved","Differentially expressed", "C. nigoni dominant", "Ambiguous"))+ ##reordering character x-axis
+  expand_limits(y=0)+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), breaks=seq(0,6000,500))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+##Saving output
+ggsave(filename = "../3-Output/Fig2A_1.pdf", dpi = 300, width = 12, height = 6 )
+
+
+############################################################################################
+##Fig1A_2 Barplot for different differentially expressed categories
+############################################################################################
+
+Fig2A_2=data.frame(Group = c(rep("Cbr dominant", 2), rep("Transgressive high", 2), rep("Transgressive low", 2), rep("Additive", 2)),
+               L1= c(840, 659, 587, 594, 589, 965, 205, 300), Line = rep(c("HI Line 1", "HI Line 2"), 2))
+
+##Stacked Barplot
+ggplot(Fig2A_2, aes(x=Line, y=L1, fill = Group))+
+  geom_bar(stat = "identity", show.legend=T, alpha=1,colour = "black")+
+  xlab(" ")+ 
+  ylab("Number of genes")+
+  theme(plot.title = element_text(size = 26, face = "bold", hjust = 0.5, vjust = 0.5))+
+  coord_cartesian(ylim = c(0, 6000))+
+  scale_fill_manual(values = c("#c08cc0", "#d5d0e2", "#482848", "#F8F2F8"))+theme(axis.title.y = element_text(size = 14, hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 16.5))+
+  theme(axis.text.y = element_text(size = 10))+
+  theme(axis.title.x = element_text(size = 14))+
+  theme(axis.title.y = element_text(size = 20, hjust = 0.5))+
+  guides(fill=guide_legend(title=" "))+
+  expand_limits(y=0)+
+  scale_y_continuous(expand = c(0, 0))
+
+#Saving output
+ggsave(filename = "../3-Output/Fig2A_2.pdf", dpi = 300, width = 12, height = 6 )
+
+```
+
+##B. Bar plots showing distribution across autosomes and X-chromosomes
+```{r}
+
+Fig2B= data.frame(Line = c(rep("HIL 1", 4), rep("HIL 2", 4)), 
+                 Chromosome= c("A", "A", "X", "X", "A", "A", "X", "X"), 
+                 DE = c("Downregulated", "Upregulated", "Downregulated", "Upregulated", "Downregulated", "Upregulated", "Downregulated", "Upregulated"),
+                 Count = c("1233", "871", "20", "105", "1506", "929", "43", "65"))
+summary(Fig2B)
+Fig2B$Count = as.integer(Fig2B$Count)#changing count column to integer
+
+ggplot(Fig2B, aes(x=Chromosome,y= Count, fill=DE, label = Count))+ 
+  geom_col(position = position_stack(reverse = FALSE), colour = "black")+ #changing the order of stacking
+  facet_wrap(~Line) + 
+  scale_fill_manual(values = c("#FE8F77", "#FFE299"))+
+  ylab("Number of differentially expressed genes")+
+  guides(fill=guide_legend(title="Differential expression"))+
+  theme(axis.title.y = element_text(size = 14, hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 12))+
+  theme(axis.text.y = element_text(size = 10))+
+  theme(axis.title.x = element_text(size = 14))+
+  theme(strip.text = element_text(size = 14))+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), breaks=seq(0,2500,250))
+  
+##Saving output
+ggsave(filename = "../3-Output/Fig2B.pdf", dpi = 300, width = 6, height = 6 )
+
+```
+
+##C. Venn Diagram with differing bubble size
+```{r}
+# library(VennDiagram)
+
+venn.diagram(list("HIL 1" = down_commonbg_330_names,
+                  "HIL 2" = down_commonbg_307_names),
+             filename = "../3-Output/fig2c_venndiagram_downregulated.png", imagetype = "png",
+             fill = c("#FFC6C4", "#CC9F9D"), alpha = c(0.6, 0.6), 
+             main.cex = 1.5, cex = 2, cat.cex = 1.3, cat.pos = c(40, -40), cat.dist = 0.045, inverted = TRUE, cat.fontface = "bold")
+
+venn.diagram(list("HIL 1" = up_commonbg_330_names,
+                  "HIL 2" = up_commonbg_307_names),
+             filename = "../3-Output/fig2c_venndiagram_Upregulated.png", imagetype = "png",
+             fill = c("#E4A302", "#FEECBE"), 
+             main.cex = 1.5, cex = 2, cat.cex = 1.3, cat.pos = c(40, -40), cat.dist = 0.045, inverted = TRUE, cat.fontface = "bold")
+
+```
+
+#3. FIGURE 3
+
+##A. Scatter plot for HIL 1
+```{r}
+
+ggplot(dds.ZZY10330 %>% filter(introgression == "C. nigoni background" & (!(cis_trans == "conserved" | cis_trans == "ambiguous"))),
+                 aes(x=logFC.ZZY10330.vs.Cni, y=logFC.ZZY10330.vs.Cbr, color=Inheritance_sum)) +
+  geom_point(show.legend=T, alpha=1) +
+  background_grid() +
+  scale_x_continuous(limits = c(-10, 15))+
+  scale_y_continuous(limits = c(-10, 15))+
+  labs(title="HIL 1")+
+  theme(axis.title.x = element_text(size = 8, face = "bold", hjust = 0.5))+
+  theme(axis.title.y = element_text(size = 8, face = "bold", hjust = 0.5))+
+  theme(plot.title = element_text(size = 12, face = "bold", hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 6.5))+
+  theme(axis.text.y = element_text(size = 6.5))+
+  scale_color_manual(values = scatter_palette)+
+  geom_hline(yintercept=0, color = "black")+
+  geom_vline(xintercept=0, color = "black")+
+  xlab("log expression difference\n(Hybrid - C. nigoni)")+
+  ylab("log expression difference\n(Hybrid - C. briggsae)")+
+  labs(color="Inheritance") #changing legend title
+  
+#Saving Output
+ggsave(file="../3-Output/fig_3a_HIL1.pdf", dpi = 300, width = 8, height = 6)
+```
+
+##B Scatterplot for HIL2
+
+```{r}
+ggplot(dds.ZZY10307 %>% filter(introgression == "C. nigoni background" & (!(cis_trans == "conserved" | cis_trans == "ambiguous"))),
+                 aes(x=logFC.ZZY10307.vs.Cni, y=logFC.ZZY10307.vs.Cbr, color=Inheritance_sum)) +
+  geom_point(show.legend=T, alpha=1) +
+  background_grid() +
+  labs(title="HIL 2")+
+  scale_x_continuous(limits = c(-10, 15))+
+  scale_y_continuous(limits = c(-10, 15))+
+  theme(axis.title.x = element_text(size = 8, face = "bold", hjust = 0.5))+
+  theme(axis.title.y = element_text(size = 8, face = "bold", hjust = 0.5))+
+  theme(plot.title = element_text(size = 12, face = "bold", hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 6.5))+
+  theme(axis.text.y = element_text(size = 6.5))+
+  geom_hline(yintercept=0, color = "black")+
+  geom_vline(xintercept=0, color = "black")+
+  xlab("log expression difference\n(Hybrid - C. nigoni)")+
+  ylab("log expression difference\n (Hybrid - C. briggsae)")+
+  labs(color="Inheritance")+ #changing legend title
+  scale_color_manual(values = scatter_palette)
+
+
+#Saving Output
+ggsave(file="../3-Output/fig_3b_HIL2.pdf", dpi = 300, width = 8, height = 6)
+
+```
+##C. Scatterplot for inheritance categories across HIL1 & HIL2
+
+NOTE: in the paper this is a represented as a bubbleplot (made in excel). 
+
+```{r}
+ggplot(all_common_bg_genes %>% filter(all_common_bg_genes$Inheritance_sum.x != all_common_bg_genes$Inheritance_sum.y & !(Inheritance_sum.x == "No change" | Inheritance_sum.y == "No change" | Inheritance_sum.x == "Ambiguous" |Inheritance_sum.y == "Ambiguous" | Inheritance_sum.x == "Cni dominant" | Inheritance_sum.y == "Cni dominant")), aes(x=Inheritance_sum.x, y=Inheritance_sum.y)) +
+  geom_jitter(show.legend=T, alpha=0.5, color = "#4D4545", width = 0.2, height = 0.25) +
+  geom_jitter(data = all_common_bg_genes %>% filter(all_common_bg_genes$Inheritance_sum.x == all_common_bg_genes$Inheritance_sum.y & !(Inheritance_sum.x == "No change" | Inheritance_sum.y == "No change" | Inheritance_sum.x == "Ambiguous" |Inheritance_sum.y == "Ambiguous" | Inheritance_sum.x == "Cni dominant" | Inheritance_sum.y == "Cni dominant")), aes(x=Inheritance_sum.x, y=Inheritance_sum.y), color = '#4D4545', width = 0.2, height = 0.25, alpha=0.5, show.legend = T)+
+  xlab("ZZY10330")+
+  ylab("ZZY10307")+
+  #labs(title = "Downregulated")+
+  theme(axis.title = element_text(size = 8)) +
+  theme(axis.text.x = element_text(size = rel(0.7), face = "bold"))+
+  theme(axis.text.y = element_text(size = 6, face = "bold"))
+
+#Saving Output
+#ggsave(filename = "file="../3-Output/fig_3c_HIL1xHIL2_inheritance_v2.png", dpi =320, width = 6.5, height = 6)
+
+```
+
+
+#4. FIGURE 4 
+##A.Scatterplot for regulatory divergence categories across HIL1 & HIL2
+
+NOTE: in the paper this is a represented as a bubbleplot (made in excel). Data used is in Table S5
+
+```{r}
+ggplot(all_common_bg_genes %>% filter(all_common_bg_genes$cis_trans_sum.x != all_common_bg_genes$cis_trans_sum.y & !(cis_trans_sum.x == "No change" | cis_trans_sum.y == "No change" | cis_trans_sum.x == "Ambiguous" |cis_trans_sum.y == "Ambiguous" | cis_trans_sum.x == "Conserved" | cis_trans_sum.y == "Conserved")), aes(x=cis_trans_sum.x, y=cis_trans_sum.y)) +
+  geom_jitter(show.legend=T, alpha=0.5, color = "#4D4545", width = 0.2, height = 0.25) +
+  geom_jitter(data = all_common_bg_genes %>% filter(all_common_bg_genes$cis_trans_sum.x == all_common_bg_genes$cis_trans_sum.y & !(cis_trans_sum.x == "No change" | cis_trans_sum.y == "No change" | cis_trans_sum.x == "Ambiguous" |cis_trans_sum.y == "Ambiguous" | cis_trans_sum.x == "Conserved" | cis_trans_sum.y == "Conserved")), aes(x=cis_trans_sum.x, y=cis_trans_sum.y), color = '#4D4545', width = 0.2, height = 0.25, alpha=0.5, show.legend = T)+
+  xlab("ZZY10330")+
+  ylab("ZZY10307")+
+  #labs(title = "Downregulated")+
+  theme(axis.title = element_text(size = 8)) +
+  theme(axis.text.x = element_text(size = rel(0.7), face = "bold"))+
+  theme(axis.text.y = element_text(size = 6, face = "bold"))
+
+#Saving Output
+#ggsave(filename = "file="../3-Output/fig_4a_HIL1xHIL2_cis_trans_v2.png", dpi =320, width = 6.5, height = 6)
+
+```
+
+
+##B. Barplots for genes showing regulatory divergence and up/downregulation
+```{r}
+Fig4_B=data.frame(Group = c("cis-trans_up","trans-only_up", "comp_up","cis-trans_down", "trans-only_down","comp_down"),
+                     L1= c(104,154,190,277,230,321), Line = c(rep("Upregulated", 3), rep("Downregulated", 3)))
+
+Fig4_B$Group = factor(Fig4_B$Group, 
+                         levels = c("cis-trans_down", "trans-only_down","comp_down", "cis-trans_up","trans-only_up", "comp_up"))
+
+ggplot(Fig4_B, aes(x=Group, y=L1, fill = Line))+
+  geom_bar(stat = "identity", show.legend=T, alpha=1, position = "dodge", colour = "black")+
+  xlab(" ")+ 
+  ylab("Number of genes")+
+  theme(plot.title = element_text(size = 26, face = "bold", hjust = 0.5, vjust = 0.5))+
+  coord_cartesian(ylim = c(0, 350))+
+  scale_fill_manual(values = c("#FE8F77", "#FFE299"))+theme(axis.title.y = element_text(size = 14, hjust = 0.5))+
+  theme(axis.text.x = element_text(size = 16.5))+
+  theme(axis.text.y = element_text(size = 10))+
+  theme(axis.title.x = element_text(size = 14))+
+  theme(axis.title.y = element_text(size = 20, hjust = 0.5))+
+  theme(axis.text.y = element_text(face="bold", color="black", size=15))+
+  guides(fill=guide_legend(title=" "))+
+  expand_limits(y=0)+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), breaks=seq(0,350,50))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+ggsave(filename = "../3-Output/Fig4_B.pdf", dpi = 300, width = 9, height = 6 )
+
+
+```
+
