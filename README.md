@@ -4,7 +4,7 @@
 
 ## Viswanath, Athmaja, and Asher D. Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
 
-### This Repository provides all the necessary codes and data to replicate analyses, results and figures presented in the Viswanath & Cutter (2023). 
+### This Repository provides all the necessary codes and data to replicate analyses, results and figures presented in Viswanath & Cutter (2023). 
 
 ## 1-Input
 ### Contains text files with readcounts 
