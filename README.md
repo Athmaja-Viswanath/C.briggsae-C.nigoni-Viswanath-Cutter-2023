@@ -3,8 +3,11 @@
 ## Authors
 **Athmaja Viswanath**  
 Email: [athmaja96@gmail.com](mailto:athmaja96@gmail.com)  
+
 **Asher Cutter**
+
 Email: [asher.cutter@utoronto.ca](mailto:asher.cutter@utoronto.ca)
+
 [Asher Cutters' Lab at University of Toronto](http://labs.eeb.utoronto.ca/cutter/index.htm)
 
 
