@@ -1,12 +1,14 @@
 # [**Regulatory Divergence as a Mechanism for X-Autosome Incompatibilities in _Caenorhabditis_ Nematodes**](https://academic.oup.com/gbe/article/15/4/evad055/7103311?login=false#403739588)
 
 ## Authors
+
 **Athmaja Viswanath**  
 Email: [athmaja96@gmail.com](mailto:athmaja96@gmail.com)  
 
-**Asher Cutter**
-Email: [asher.cutter@utoronto.ca](mailto:asher.cutter@utoronto.ca)
-[Asher Cutters' Lab at University of Toronto](http://labs.eeb.utoronto.ca/cutter/index.htm)
+**Asher Cutter**  
+Email: [asher.cutter@utoronto.ca](mailto:asher.cutter@utoronto.ca)  
+[Asher Cutter's Lab at the University of Toronto](http://labs.eeb.utoronto.ca/cutter/index.htm)
+
 
 
 ## Citation
