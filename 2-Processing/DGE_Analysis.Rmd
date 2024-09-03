@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-#This document is a guide to replicate the analysis and results (after receivng readcounts) presented in Viswanath, Athmaja, and Asher D. Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
+#This document is a guide to replicate the analysis and results presented in Viswanath & Cutter 2023. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
 
 #0. LOADING REQUIRED PACKAGES
 ```{r}
