@@ -7,7 +7,7 @@ Email: [athmaja96@gmail.com](mailto:athmaja96@gmail.com)
 
 **Asher Cutter**  
 Email: [asher.cutter@utoronto.ca](mailto:asher.cutter@utoronto.ca)  
-[Asher Cutter's Lab at the University of Toronto](http://labs.eeb.utoronto.ca/cutter/index.htm)
+[Asher Cutter's Lab at the University of Toronto](https://cutter.eeb.utoronto.ca/)
 
 
 
