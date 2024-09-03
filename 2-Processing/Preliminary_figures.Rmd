@@ -202,7 +202,7 @@ ggsave(file="../3-Output/fig_3b_HIL2.pdf", dpi = 300, width = 8, height = 6)
 ```
 ##C. Scatterplot for inheritance categories across HIL1 & HIL2
 
-NOTE: in the paper this is a represented as a bubbleplot (made in excel). 
+NOTE: in the paper this is represented as a bubbleplot 
 
 ```{r}
 ggplot(all_common_bg_genes %>% filter(all_common_bg_genes$Inheritance_sum.x != all_common_bg_genes$Inheritance_sum.y & !(Inheritance_sum.x == "No change" | Inheritance_sum.y == "No change" | Inheritance_sum.x == "Ambiguous" |Inheritance_sum.y == "Ambiguous" | Inheritance_sum.x == "Cni dominant" | Inheritance_sum.y == "Cni dominant")), aes(x=Inheritance_sum.x, y=Inheritance_sum.y)) +
@@ -224,7 +224,7 @@ ggplot(all_common_bg_genes %>% filter(all_common_bg_genes$Inheritance_sum.x != a
 #4. FIGURE 4 
 ##A.Scatterplot for regulatory divergence categories across HIL1 & HIL2
 
-NOTE: in the paper this is a represented as a bubbleplot (made in excel). Data used is in Table S5
+NOTE: in the paper this is represented as a bubbleplot. Data used is in Table S5
 
 ```{r}
 ggplot(all_common_bg_genes %>% filter(all_common_bg_genes$cis_trans_sum.x != all_common_bg_genes$cis_trans_sum.y & !(cis_trans_sum.x == "No change" | cis_trans_sum.y == "No change" | cis_trans_sum.x == "Ambiguous" |cis_trans_sum.y == "Ambiguous" | cis_trans_sum.x == "Conserved" | cis_trans_sum.y == "Conserved")), aes(x=cis_trans_sum.x, y=cis_trans_sum.y)) +
