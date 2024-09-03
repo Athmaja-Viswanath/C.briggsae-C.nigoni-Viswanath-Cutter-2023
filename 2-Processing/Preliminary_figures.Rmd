@@ -1,6 +1,6 @@
 ---
 title: "Preliminary Figures"
-author: "Athmaja Viswa"
+author: "Athmaja Viswanath"
 date: "2024-08-31"
 output:
   html_document:
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
-These are preliminary figures that are made using the data. These figures were then customized using Adobe Illustrator to make the final versions of the figure in the publication Viswanath, Athmaja, and Asher D. Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
+These are preliminary figures that are made using the data and anlayses in DGE_Analysis.Rmd. These figures were then customized using Adobe Illustrator to make the final versions of the figure in the publication Viswanath and Cutter. "Regulatory divergence as a mechanism for X-autosome incompatibilities in Caenorhabditis nematodes." Genome Biology and Evolution 15.4 (2023): evad055.
 
 #0. LOADING REQUIRED PACKAGES
 
