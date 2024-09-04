@@ -14,7 +14,7 @@ module load gnu-parallel/20191122 || { echo "Failed to load gnu-parallel module"
 find *.gz | parallel "gunzip {}"
 
 # Load necessary modules for FastQC
-module load CCEnv StdEnv/2020 nixpkgs/16.09 fastqc/0.11.8 || { echo "Failed to load FastQC modules"; exit 1; }
+module load CCEnv StdEnv/2020 nixpkgs/16.09 f/0.11.8 || { echo "Failed to load FastQC modules"; exit 1; }
 
 # Create output directory for FastQC results if it doesn't exist
 mkdir -p ../fastqc_after

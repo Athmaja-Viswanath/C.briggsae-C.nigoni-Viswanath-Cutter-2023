@@ -1,5 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
+#SBATCH --mail-user=athmaja.viswanath@mail.utoronto.ca
+#SBATCH --mail-type=ALL
 #SBATCH --time=12:00:00
 
 
