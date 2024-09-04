@@ -22,6 +22,12 @@ This repository contains the code and data needed to replicate the analyses, res
 
 ## Repository Structure
 
+### 0-BASH scripts for Quality Control and Read Alignment
+- **`1.parallel_gzip_fastqc.sh`**: Runs FASTQC on remote server.
+- **`2.trimmomatic.sh`**: Runs TRIMMOMATIC for read clean up on remote server.
+- **`3.star_mapping.sh`**: Aligns reads to _C. briggsae_ and _C. nigoni_ genomes (code for indexing the genomes not included)
+- **`4.featurecounts_readcounting.sh`**: Aligns and quantifies readcounts for each genes usign FeatureCounts
+  
 ### 1-Input 
 - **`Cbr_fc_counts_AJ.txt`**: Read counts from aligning all samples (_C. briggsae_, _C. nigoni_, HIL1, and HIL2) to the _C. briggsae_ genome.
 - **`Cni_fc_counts_AJ.txt`**: Read counts from aligning all samples (_C. briggsae_, _C. nigoni_, HIL1, and HIL2) to the _C. nigoni_ genome.
