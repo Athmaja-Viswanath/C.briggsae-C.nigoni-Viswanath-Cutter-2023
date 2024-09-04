@@ -22,16 +22,16 @@ This repository contains the code and data needed to replicate the analyses, res
 
 ## Repository Structure
 
-### 1. Input Data
+### 1-Input 
 - **`Cbr_fc_counts_AJ.txt`**: Read counts from aligning all samples (_C. briggsae_, _C. nigoni_, HIL1, and HIL2) to the _C. briggsae_ genome.
 - **`Cni_fc_counts_AJ.txt`**: Read counts from aligning all samples (_C. briggsae_, _C. nigoni_, HIL1, and HIL2) to the _C. nigoni_ genome.
 - **`orthologs_dnds2_athmaja_wb.txt`**: Contains 1:1 orthologous gene pairs between _C. briggsae_ and _C. nigoni_.
 
-### 2. Processing
+### 2-Processing
 - **`DGE_Analysis.Rmd`**: RMarkdown file with code for differential gene expression analysis and categorization of genes into different inheritance and regulatory divergence categories.
 - **`Preliminary_figures.Rmd`**: RMarkdown file with code for generating figures. Note that these figures were further edited using Adobe Illustrator. Only the code for data figures (Figures 2-4) is included; Figure 1 (experimental design/summary) is not provided.
 
-### 3. Output
+### 3-Output
 - Contains all the generated figures and additional files resulting from the analyses.
 
 ## Usage
